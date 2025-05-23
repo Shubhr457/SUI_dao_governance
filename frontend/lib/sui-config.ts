@@ -1,7 +1,8 @@
 export const SUI_CONFIG = {
-  PACKAGE_ID: '0x29a6132ed3245db42adac3bbb86fe38ed7d4677585546aaa9a70294f3e1fa05b',
+  PACKAGE_ID: '0x7b76018e6fd63a9db7f9ce9542cad8180b723f07e04589a0197427bd96fabfcd',
   NETWORK: 'testnet', // Change to 'mainnet' for production
   RPC_URL: 'https://fullnode.testnet.sui.io:443',
+  CLOCK_ID: '0x6', // Sui shared Clock object ID (same across all networks)
 };
 
 export const DAO_GOVERNANCE_MODULE = `${SUI_CONFIG.PACKAGE_ID}::dao_governance`;

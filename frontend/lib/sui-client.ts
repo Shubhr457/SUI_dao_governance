@@ -39,8 +39,14 @@ export class DAOGovernanceClient {
     // Convert SUI to MIST for initial treasury
     const treasuryAmount = suiToMist(params.initial_treasury);
     
-    // Create coin for initial treasury
-    const [coin] = tx.splitCoins(tx.gas, [tx.pure(treasuryAmount)]);
+    let coin;
+    if (treasuryAmount > 0) {
+      // Create coin for initial treasury
+      [coin] = tx.splitCoins(tx.gas, [tx.pure(treasuryAmount)]);
+    } else {
+      // Create zero-value coin for empty treasury
+      [coin] = tx.splitCoins(tx.gas, [tx.pure(0)]);
+    }
     
     tx.moveCall({
       target: `${DAO_GOVERNANCE_MODULE}::${FUNCTIONS.CREATE_DAO}`,
@@ -248,7 +254,7 @@ export class DAOGovernanceClient {
             voting_period: Number(fields.governance_config.fields.voting_period),
             timelock_period: Number(fields.governance_config.fields.timelock_period),
           },
-          treasury_balance: Number(fields.treasury.fields.value),
+          treasury_balance: fields.treasury && fields.treasury.fields ? Number(fields.treasury.fields.value) : 0,
           proposal_count: Number(fields.proposal_count),
           member_count: Number(fields.member_count),
         };
@@ -306,6 +312,273 @@ export class DAOGovernanceClient {
       return [];
     }
   }
+
+  // Check if an address is a member of a DAO
+  async checkDAOMembership(daoId: string, address: string): Promise<{isMember: boolean, votingPower: number}> {
+    try {
+      // Query events for MemberRegisteredEvent
+      const events = await this.client.queryEvents({
+        query: { MoveEventType: `${SUI_CONFIG.PACKAGE_ID}::dao_governance::MemberRegisteredEvent` },
+        limit: 100,
+        order: 'descending',
+      });
+      
+      // Filter events for this specific DAO and address
+      const memberEvents = events.data.filter(event => {
+        const parsedJson = event.parsedJson as any;
+        return parsedJson?.dao_id === daoId && parsedJson?.member === address;
+      });
+      
+      if (memberEvents.length > 0) {
+        // User is a member, get their voting power from the most recent event
+        const mostRecentEvent = memberEvents[0];
+        const votingPower = Number((mostRecentEvent.parsedJson as any).voting_power);
+        return { isMember: true, votingPower };
+      }
+      
+      // User is not a member
+      return { isMember: false, votingPower: 0 };
+    } catch (error) {
+      console.error('Error checking DAO membership:', error);
+      return { isMember: false, votingPower: 0 };
+    }
+  }
+
+  // Get proposals for a DAO
+  async getDAOProposals(daoId: string): Promise<Proposal[]> {
+    try {
+      // First, get the DAO details to check if it exists
+      const daoDetails = await this.getDAODetails(daoId);
+      if (!daoDetails) {
+        console.log('DAO details not found for ID:', daoId);
+        return [];
+      }
+
+      // Get proposal creation events for this DAO
+      const events = await this.client.queryEvents({
+        query: { MoveEventType: `${SUI_CONFIG.PACKAGE_ID}::dao_governance::ProposalCreatedEvent` },
+        limit: 50,
+        order: 'descending',
+      });
+      
+      console.log('All proposal events found:', events.data.length);
+      console.log('Looking for DAO ID:', daoId);
+      
+      // More flexible filtering for DAO ID
+      const daoEvents = events.data.filter(event => {
+        const parsedJson = event.parsedJson as any;
+        // Log each event's DAO ID for debugging
+        console.log('Event DAO ID:', parsedJson?.dao_id, 'Type:', typeof parsedJson?.dao_id);
+        
+        // Try multiple comparison methods
+        return (
+          parsedJson?.dao_id === daoId || 
+          parsedJson?.dao_id?.toString() === daoId ||
+          // Normalize both to lowercase for case-insensitive comparison
+          parsedJson?.dao_id?.toLowerCase() === daoId.toLowerCase()
+        );
+      });
+      
+      console.log('Filtered proposal events for this DAO:', daoEvents.length);
+      
+      // If no events found from blockchain, check localStorage for recently created proposals
+      if (daoEvents.length === 0 && typeof window !== 'undefined') {
+        console.log('No events found from blockchain, checking localStorage for recent proposals');
+        const localProposals: Proposal[] = [];
+        
+        // Check localStorage for any saved proposals
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          // Look for both formats of keys: 'proposal-<id>' and 'proposal-<daoId>-<id>'
+          if (key && key.startsWith('proposal-')) {
+            try {
+              const storedData = JSON.parse(localStorage.getItem(key) || '{}');
+              
+              // Check if this proposal belongs to the current DAO
+              if (storedData.daoId && 
+                  (storedData.daoId === daoId || 
+                   storedData.daoId.toLowerCase() === daoId.toLowerCase())) {
+                
+                console.log('Found locally stored proposal for this DAO:', key);
+                
+                // Extract proposal ID from the key or use a timestamp
+                let proposalId: number;
+                const keyParts = key.split('-');
+                if (keyParts.length > 2 && !isNaN(Number(keyParts[keyParts.length - 1]))) {
+                  proposalId = Number(keyParts[keyParts.length - 1]);
+                } else {
+                  proposalId = storedData.timestamp ? Math.floor(storedData.timestamp / 1000) : Date.now();
+                }
+                
+                // Handle both storage formats
+                let title = '';
+                let description = '';
+                let proposalType = { code: 0 }; // Default to text proposal
+                
+                // Check if data is in the proposalEvent format (old format)
+                if (storedData.proposalEvent && storedData.proposalEvent.parsedJson) {
+                  const eventData = storedData.proposalEvent.parsedJson;
+                  title = eventData.title || '';
+                  description = eventData.description || '';
+                  if (eventData.proposal_type !== undefined) {
+                    proposalType = { code: Number(eventData.proposal_type) };
+                  }
+                } 
+                // Check if data is in the direct format (new format)
+                else {
+                  title = storedData.title || '';
+                  description = storedData.description || '';
+                  if (storedData.proposal_type !== undefined) {
+                    proposalType = { code: Number(storedData.proposal_type) };
+                  }
+                }
+                
+                // Create a proposal object from the stored data
+                const proposal: Proposal = {
+                  id: proposalId,
+                  proposer: storedData.proposer || '',
+                  title: title,
+                  description: description,
+                  proposal_type: proposalType,
+                  status: { code: 0 }, // Default to active
+                  created_at: storedData.timestamp ? Math.floor(storedData.timestamp / 1000) : Math.floor(Date.now() / 1000),
+                  voting_ends_at: Math.floor(Date.now() / 1000) + 86400, // Default to 24 hours from now
+                  execution_time: 0,
+                  yes_votes: 0,
+                  no_votes: 0,
+                  voters: [],
+                  treasury_transfer_amount: 0,
+                  treasury_transfer_recipient: '',
+                  parameter_key: '',
+                  parameter_value: 0,
+                  validator_address: ''
+                };
+                
+                localProposals.push(proposal);
+              }
+            } catch (error) {
+              console.error('Error parsing stored proposal:', error);
+            }
+          }
+        }
+        
+        if (localProposals.length > 0) {
+          console.log('Found locally stored proposals:', localProposals);
+          return localProposals;
+        }
+      }
+
+      // Get vote events to calculate current vote tallies
+      const voteEvents = await this.client.queryEvents({
+        query: { MoveEventType: `${SUI_CONFIG.PACKAGE_ID}::dao_governance::VoteCastEvent` },
+        limit: 100,
+        order: 'descending',
+      });
+
+      // Filter vote events for this DAO with improved matching
+      const daoVoteEvents = voteEvents.data.filter(event => {
+        const parsedJson = event.parsedJson as any;
+        return (
+          parsedJson?.dao_id === daoId || 
+          parsedJson?.dao_id?.toString() === daoId ||
+          parsedJson?.dao_id?.toLowerCase() === daoId.toLowerCase()
+        );
+      });
+
+      // Get execution events
+      const executionEvents = await this.client.queryEvents({
+        query: { MoveEventType: `${SUI_CONFIG.PACKAGE_ID}::dao_governance::ProposalExecutedEvent` },
+        limit: 50,
+        order: 'descending',
+      });
+
+      // Filter execution events for this DAO with improved matching
+      const daoExecutionEvents = executionEvents.data.filter(event => {
+        const parsedJson = event.parsedJson as any;
+        return (
+          parsedJson?.dao_id === daoId || 
+          parsedJson?.dao_id?.toString() === daoId ||
+          parsedJson?.dao_id?.toLowerCase() === daoId.toLowerCase()
+        );
+      });
+
+      // Transform events into proposal objects
+      const proposals = daoEvents.map(event => {
+        const eventData = event.parsedJson as any;
+        const proposalId = Number(eventData.proposal_id);
+        
+        // Calculate votes for this proposal
+        let yesVotes = 0;
+        let noVotes = 0;
+        const voters: string[] = [];
+        
+        daoVoteEvents.forEach(voteEvent => {
+          const voteData = voteEvent.parsedJson as any;
+          if (Number(voteData.proposal_id) === proposalId) {
+            const votingPower = Number(voteData.voting_power);
+            if (voteData.vote) {
+              yesVotes += votingPower;
+            } else {
+              noVotes += votingPower;
+            }
+            voters.push(voteData.voter);
+          }
+        });
+        
+        // Check if proposal was executed
+        const executed = daoExecutionEvents.some(execEvent => {
+          const execData = execEvent.parsedJson as any;
+          return Number(execData.proposal_id) === proposalId;
+        });
+        
+        // Determine proposal status
+        let status = { code: 0 }; // Active by default
+        const currentTime = Math.floor(Date.now() / 1000);
+        const votingEndsAt = Number(eventData.voting_ends_at);
+        
+        if (executed) {
+          status = { code: 3 }; // Executed
+        } else if (currentTime > votingEndsAt) {
+          // Voting period ended
+          const totalVotes = yesVotes + noVotes;
+          const quorum = daoDetails.governance_config.voting_quorum;
+          const threshold = daoDetails.governance_config.voting_threshold;
+          
+          if (totalVotes >= quorum && (yesVotes / totalVotes) * 100 >= threshold) {
+            status = { code: 1 }; // Passed
+          } else {
+            status = { code: 2 }; // Failed
+          }
+        }
+        
+        // Create proposal object
+        return {
+          id: proposalId,
+          proposer: eventData.proposer,
+          title: eventData.title,
+          description: eventData.description || '',
+          proposal_type: { code: 0 }, // Default to treasury proposal
+          status,
+          created_at: Number(event.timestampMs) / 1000,
+          voting_ends_at: votingEndsAt,
+          execution_time: 0, // This would need to be calculated based on timelock
+          yes_votes: yesVotes,
+          no_votes: noVotes,
+          voters,
+          treasury_transfer_amount: 0, // These fields would need to be populated from additional data
+          treasury_transfer_recipient: '',
+          parameter_key: '',
+          parameter_value: 0,
+          validator_address: ''
+        };
+      });
+      
+      return proposals;
+    } catch (error) {
+      console.error('Error fetching DAO proposals:', error);
+      return [];
+    }
+  }
 }
 
-export const daoGovernanceClient = new DAOGovernanceClient(); 
+export const daoGovernanceClient = new DAOGovernanceClient();

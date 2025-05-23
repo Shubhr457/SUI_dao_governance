@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,67 +12,26 @@ import { Clock, ArrowUpRight, ArrowDownRight, FileText, MessageSquare, Activity 
 
 export function ProposalDetail({ id }: { id: string }) {
   const [hasVoted, setHasVoted] = useState(false)
+  const [proposal, setProposal] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  // Mock data for a proposal
-  const proposal = {
-    id,
-    title: "Increase Validator Rewards",
-    description:
-      "This proposal aims to increase the rewards for validators by 2% to incentivize more participation in the network. By increasing rewards, we expect to attract more validators, which will enhance the security and decentralization of our network.",
-    status: "active",
-    endTime: "2 days",
-    createdAt: "May 20, 2025",
-    author: {
-      address: "0x7a3b...f921",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    votes: {
-      for: 65,
-      against: 35,
-      total: 850000,
-      quorum: 30,
-    },
-    details: {
-      quorum: "30% of total voting power",
-      threshold: "Simple majority (>50%)",
-      votingPeriod: "7 days",
-      implementation: "Automatic execution upon approval",
-    },
-    discussion: [
-      {
-        author: {
-          address: "0x7a3b...f921",
-          avatar: "/placeholder.svg?height=32&width=32",
-        },
-        content:
-          "I believe this proposal is essential for the long-term health of our network. Increasing validator rewards will attract more participants.",
-        timestamp: "2 days ago",
-      },
-      {
-        author: {
-          address: "0x3c4d...e832",
-          avatar: "/placeholder.svg?height=32&width=32",
-        },
-        content:
-          "While I understand the intent, I'm concerned about the inflationary pressure this might create. Has there been an economic analysis?",
-        timestamp: "1 day ago",
-      },
-      {
-        author: {
-          address: "0x9f2e...b743",
-          avatar: "/placeholder.svg?height=32&width=32",
-        },
-        content:
-          "I support this proposal. The increased security from more validators outweighs the minimal inflation impact.",
-        timestamp: "12 hours ago",
-      },
-    ],
-  }
+  useEffect(() => {
+    // TODO: Fetch proposal data from blockchain
+    setLoading(false)
+  }, [id])
 
   const handleVote = (vote: "for" | "against") => {
-    // In a real implementation, this would send a transaction to the blockchain
+    // TODO: Implement actual blockchain vote transaction
     console.log(`Voting ${vote} on proposal ${id}`)
     setHasVoted(true)
+  }
+
+  if (loading) {
+    return <div className="text-center text-muted-foreground">Loading proposal...</div>
+  }
+
+  if (!proposal) {
+    return <div className="text-center text-muted-foreground">Proposal not found</div>
   }
 
   return (
@@ -197,19 +156,19 @@ export function ProposalDetail({ id }: { id: string }) {
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <dt className="text-sm font-medium text-muted-foreground">Quorum</dt>
-                  <dd className="text-sm">{proposal.details.quorum}</dd>
+                  <dd className="text-sm">{proposal.details?.quorum || "Loading..."}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Approval Threshold</dt>
-                  <dd className="text-sm">{proposal.details.threshold}</dd>
+                  <dt className="text-sm font-medium text-muted-foreground">Threshold</dt>
+                  <dd className="text-sm">{proposal.details?.threshold || "Loading..."}</dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-muted-foreground">Voting Period</dt>
-                  <dd className="text-sm">{proposal.details.votingPeriod}</dd>
+                  <dd className="text-sm">{proposal.details?.votingPeriod || "Loading..."}</dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-muted-foreground">Implementation</dt>
-                  <dd className="text-sm">{proposal.details.implementation}</dd>
+                  <dd className="text-sm">{proposal.details?.implementation || "Loading..."}</dd>
                 </div>
               </dl>
             </CardContent>
@@ -218,26 +177,30 @@ export function ProposalDetail({ id }: { id: string }) {
         <TabsContent value="discussion">
           <Card>
             <CardHeader>
-              <CardTitle>Community Discussion</CardTitle>
+              <CardTitle>Discussion</CardTitle>
+              <CardDescription>Community discussion about this proposal</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {proposal.discussion.map((comment, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center gap-2">
+                {!proposal.discussion || proposal.discussion.length === 0 ? (
+                  <div className="text-center text-muted-foreground">No discussion yet</div>
+                ) : (
+                  proposal.discussion.map((comment, index) => (
+                    <div key={index} className="flex items-start gap-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={comment.author.avatar || "/placeholder.svg"} alt="Avatar" />
-                        <AvatarFallback>{comment.author.address.substring(2, 4).toUpperCase()}</AvatarFallback>
+                        <AvatarImage src={comment.author.avatar} />
+                        <AvatarFallback>{comment.author.address.slice(2, 4).toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{comment.author.address}</p>
-                        <p className="text-xs text-muted-foreground">{comment.timestamp}</p>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{comment.author.address}</p>
+                          <p className="text-xs text-muted-foreground">{comment.timestamp}</p>
+                        </div>
+                        <p className="text-sm">{comment.content}</p>
                       </div>
                     </div>
-                    <p className="text-sm">{comment.content}</p>
-                    {index < proposal.discussion.length - 1 && <Separator />}
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -245,63 +208,31 @@ export function ProposalDetail({ id }: { id: string }) {
         <TabsContent value="activity">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Votes</CardTitle>
+              <CardTitle>Voting Activity</CardTitle>
+              <CardDescription>Recent votes on this proposal</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  {
-                    voter: "0x3c4d...e832",
-                    vote: "against",
-                    power: "25,000 SUI",
-                    time: "1 day ago",
-                  },
-                  {
-                    voter: "0x9f2e...b743",
-                    vote: "for",
-                    power: "42,000 SUI",
-                    time: "1 day ago",
-                  },
-                  {
-                    voter: "0x5d1f...a621",
-                    vote: "for",
-                    power: "18,500 SUI",
-                    time: "2 days ago",
-                  },
-                  {
-                    voter: "0x2b8c...d934",
-                    vote: "for",
-                    power: "31,000 SUI",
-                    time: "2 days ago",
-                  },
-                  {
-                    voter: "0x6e7a...c412",
-                    vote: "against",
-                    power: "15,000 SUI",
-                    time: "3 days ago",
-                  },
-                ].map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between border-b pb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`rounded-full p-1 ${activity.vote === "for" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}
-                      >
-                        {activity.vote === "for" ? (
-                          <ArrowUpRight className="h-4 w-4" />
-                        ) : (
-                          <ArrowDownRight className="h-4 w-4" />
-                        )}
+                {!proposal.votingActivity || proposal.votingActivity.length === 0 ? (
+                  <div className="text-center text-muted-foreground">No voting activity yet</div>
+                ) : (
+                  proposal.votingActivity.map((vote, index) => (
+                    <div key={index} className="flex items-center justify-between border-b pb-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback>{vote.voter.slice(2, 4).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{vote.voter}</span>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{activity.voter}</p>
-                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge className={vote.choice === "for" ? "bg-green-500" : "bg-red-500"}>
+                          {vote.choice === "for" ? "For" : "Against"}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">{vote.timestamp}</span>
                       </div>
                     </div>
-                    <p className={`text-sm font-medium ${activity.vote === "for" ? "text-green-600" : "text-red-600"}`}>
-                      {activity.power}
-                    </p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

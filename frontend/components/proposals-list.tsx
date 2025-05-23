@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -8,125 +8,234 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { Clock, ArrowRight, Search } from "lucide-react"
+import { useCurrentDAO } from "@/hooks/useDAO"
+import { Proposal } from "@/lib/types"
+import { daoGovernanceClient } from "@/lib/sui-client"
+import { Spinner } from "@/components/ui/spinner"
 
 export function ProposalsList() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [proposals, setProposals] = useState({
+    active: [] as Proposal[],
+    passed: [] as Proposal[],
+    rejected: [] as Proposal[],
+    executed: [] as Proposal[]
+  })
+  
+  const { currentDAOId } = useCurrentDAO()
 
-  const proposals = {
-    active: [
-      {
-        id: "1",
-        title: "Increase Validator Rewards",
-        description: "Proposal to increase the rewards for validators by 2% to incentivize more participation",
-        status: "active",
-        endTime: "2 days",
-        votes: { for: 65, against: 35 },
-      },
-      {
-        id: "2",
-        title: "Treasury Allocation for Marketing",
-        description: "Allocate 50,000 SUI from the treasury for a marketing campaign to increase DAO visibility",
-        status: "active",
-        endTime: "12 hours",
-        votes: { for: 78, against: 22 },
-      },
-      {
-        id: "3",
-        title: "Add New Validator Selection Criteria",
-        description: "Implement new performance-based criteria for validator selection",
-        status: "active",
-        endTime: "4 days",
-        votes: { for: 42, against: 58 },
-      },
-    ],
-    passed: [
-      {
-        id: "4",
-        title: "Governance Token Distribution",
-        description: "Distribute 100,000 governance tokens to early contributors",
-        status: "passed",
-        endTime: "ended 3 days ago",
-        votes: { for: 92, against: 8 },
-      },
-      {
-        id: "5",
-        title: "Increase Quorum Requirements",
-        description: "Increase the quorum requirement for proposal approval from 30% to 40%",
-        status: "passed",
-        endTime: "ended 1 week ago",
-        votes: { for: 85, against: 15 },
-      },
-    ],
-    rejected: [
-      {
-        id: "6",
-        title: "Reduce Proposal Submission Threshold",
-        description: "Lower the token threshold required to submit proposals from 1% to 0.5% of total supply",
-        status: "rejected",
-        endTime: "ended 2 days ago",
-        votes: { for: 32, against: 68 },
-      },
-      {
-        id: "7",
-        title: "Change Voting Period Duration",
-        description: "Reduce the standard voting period from 7 days to 5 days",
-        status: "rejected",
-        endTime: "ended 2 weeks ago",
-        votes: { for: 45, against: 55 },
-      },
-    ],
-  }
+  // Function to retrieve proposals from localStorage directly in the component
+  const getLocalProposals = (daoId: string) => {
+    if (typeof window === 'undefined') return [];
+    
+    const localProposals: Proposal[] = [];
+    const normalizedDAOId = daoId.toLowerCase();
+    
+    // Check localStorage for any saved proposals
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('proposal-')) {
+        try {
+          const storedData = JSON.parse(localStorage.getItem(key) || '{}');
+          
+          // Check if this proposal belongs to the current DAO
+          if (storedData.daoId && 
+              (storedData.daoId === normalizedDAOId || 
+                storedData.daoId.toLowerCase() === normalizedDAOId)) {
+            
+            console.log('Found locally stored proposal in component:', key);
+            
+            // Extract proposal ID from the key or use a timestamp
+            let proposalId: number;
+            const keyParts = key.split('-');
+            if (keyParts.length > 2 && !isNaN(Number(keyParts[keyParts.length - 1]))) {
+              proposalId = Number(keyParts[keyParts.length - 1]);
+            } else {
+              proposalId = storedData.timestamp ? Math.floor(storedData.timestamp / 1000) : Date.now();
+            }
+            
+            // Determine title and description
+            const title = storedData.title || 
+              (storedData.proposalEvent?.parsedJson?.title) || 
+              'Untitled Proposal';
+              
+            const description = storedData.description || 
+              (storedData.proposalEvent?.parsedJson?.description) || 
+              'No description';
+            
+            // Create a proposal object
+            const proposal: Proposal = {
+              id: proposalId,
+              proposer: storedData.proposer || '',
+              title: title,
+              description: description,
+              proposal_type: { code: storedData.proposal_type || 0 },
+              status: { code: 0 }, // Default to active
+              created_at: storedData.timestamp ? Math.floor(storedData.timestamp / 1000) : Math.floor(Date.now() / 1000),
+              voting_ends_at: Math.floor(Date.now() / 1000) + 86400, // Default to 24 hours from now
+              execution_time: 0,
+              yes_votes: 0,
+              no_votes: 0,
+              voters: [],
+              treasury_transfer_amount: 0,
+              treasury_transfer_recipient: '',
+              parameter_key: '',
+              parameter_value: 0,
+              validator_address: ''
+            };
+            
+            localProposals.push(proposal);
+          }
+        } catch (error) {
+          console.error('Error parsing stored proposal:', error);
+        }
+      }
+    }
+    
+    return localProposals;
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
+  // Fetch proposals when currentDAOId changes
+  useEffect(() => {
+    async function fetchProposals() {
+      if (!currentDAOId) {
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      try {
+        // Normalize the DAO ID to ensure consistent format
+        const normalizedDAOId = currentDAOId.toLowerCase()
+        console.log('Fetching proposals for normalized DAO ID:', normalizedDAOId)
+        
+        // First try to get proposals from the blockchain
+        const blockchainProposals = await daoGovernanceClient.getDAOProposals(normalizedDAOId)
+        console.log('Fetched blockchain proposals:', blockchainProposals)
+        
+        // Then get any locally stored proposals
+        const localProposals = getLocalProposals(normalizedDAOId)
+        console.log('Fetched local proposals:', localProposals)
+        
+        // Combine both sources (blockchain takes precedence for duplicates)
+        const allProposals = [...localProposals];
+        
+        // Add blockchain proposals, avoiding duplicates by ID
+        for (const proposal of blockchainProposals) {
+          if (!allProposals.some(p => p.id === proposal.id)) {
+            allProposals.push(proposal);
+          }
+        }
+        
+        console.log('Combined proposals:', allProposals)
+        
+        // Categorize proposals by status
+        const active: Proposal[] = []
+        const passed: Proposal[] = []
+        const rejected: Proposal[] = []
+        const executed: Proposal[] = []
+
+        allProposals.forEach(proposal => {
+          switch (proposal.status.code) {
+            case 0: // Active
+              active.push(proposal)
+              break
+            case 1: // Passed
+              passed.push(proposal)
+              break
+            case 2: // Failed/Rejected
+              rejected.push(proposal)
+              break
+            case 3: // Executed
+              executed.push(proposal)
+              break
+          }
+        })
+
+        setProposals({ active, passed, rejected, executed })
+      } catch (error) {
+        console.error('Error fetching proposals:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProposals()
+  }, [currentDAOId])
+
+  const getStatusColor = (statusCode: number) => {
+    switch (statusCode) {
+      case 0: // Active
         return "bg-blue-500 hover:bg-blue-600"
-      case "passed":
+      case 1: // Passed
         return "bg-green-500 hover:bg-green-600"
-      case "rejected":
+      case 2: // Failed/Rejected
         return "bg-red-500 hover:bg-red-600"
+      case 3: // Executed
+        return "bg-purple-500 hover:bg-purple-600"
       default:
         return "bg-gray-500 hover:bg-gray-600"
     }
   }
+  
+  const getStatusText = (statusCode: number) => {
+    switch (statusCode) {
+      case 0: return "Active"
+      case 1: return "Passed"
+      case 2: return "Rejected"
+      case 3: return "Executed"
+      default: return "Unknown"
+    }
+  }
 
-  const renderProposalCard = (proposal: any) => (
-    <Card key={proposal.id}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl">{proposal.title}</CardTitle>
-          <Badge className={getStatusColor(proposal.status)}>
-            {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
-          </Badge>
-        </div>
-        <CardDescription>{proposal.description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span>For: {proposal.votes.for}%</span>
-            <span>Against: {proposal.votes.against}%</span>
+  const renderProposalCard = (proposal: Proposal) => {
+    // Calculate vote percentages
+    const totalVotes = proposal.yes_votes + proposal.no_votes
+    const forPercentage = totalVotes > 0 ? Math.round((proposal.yes_votes / totalVotes) * 100) : 0
+    const againstPercentage = totalVotes > 0 ? Math.round((proposal.no_votes / totalVotes) * 100) : 0
+    
+    // Format end time
+    const endTime = new Date(proposal.voting_ends_at * 1000).toLocaleString()
+    
+    return (
+      <Card key={proposal.id}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl">{proposal.title}</CardTitle>
+            <Badge className={getStatusColor(proposal.status.code)}>
+              {getStatusText(proposal.status.code)}
+            </Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-2 flex-1 rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${proposal.votes.for}%` }} />
+          <CardDescription>{proposal.description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span>For: {forPercentage}%</span>
+              <span>Against: {againstPercentage}%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 flex-1 rounded-full bg-muted">
+                <div className="h-full rounded-full bg-primary" style={{ width: `${forPercentage}%` }} />
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>Voting ends: {endTime}</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            <span>{proposal.endTime}</span>
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter>
-        <Button variant="ghost" size="sm" className="ml-auto gap-1" asChild>
-          <Link href={`/proposals/${proposal.id}`}>
-            View Details <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
-      </CardFooter>
-    </Card>
-  )
+        </CardContent>
+        <CardFooter>
+          <Button variant="ghost" size="sm" className="ml-auto gap-1" asChild>
+            <Link href={`/proposals/${proposal.id}`}>
+              View Details <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -148,22 +257,53 @@ export function ProposalsList() {
         </Button>
       </div>
 
-      <Tabs defaultValue="active" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="active">Active ({proposals.active.length})</TabsTrigger>
-          <TabsTrigger value="passed">Passed ({proposals.passed.length})</TabsTrigger>
-          <TabsTrigger value="rejected">Rejected ({proposals.rejected.length})</TabsTrigger>
-        </TabsList>
-        <TabsContent value="active" className="space-y-4">
-          {proposals.active.map(renderProposalCard)}
-        </TabsContent>
-        <TabsContent value="passed" className="space-y-4">
-          {proposals.passed.map(renderProposalCard)}
-        </TabsContent>
-        <TabsContent value="rejected" className="space-y-4">
-          {proposals.rejected.map(renderProposalCard)}
-        </TabsContent>
-      </Tabs>
+      {!currentDAOId ? (
+        <div className="text-center p-8 text-muted-foreground">
+          No DAO selected. Please select a DAO to view its proposals.
+        </div>
+      ) : loading ? (
+        <div className="flex justify-center items-center p-12">
+          <Spinner size="lg" />
+          <span className="ml-2">Loading proposals...</span>
+        </div>
+      ) : (
+        <Tabs defaultValue="active" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="active">Active ({proposals.active.length})</TabsTrigger>
+            <TabsTrigger value="passed">Passed ({proposals.passed.length})</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected ({proposals.rejected.length})</TabsTrigger>
+            <TabsTrigger value="executed">Executed ({proposals.executed.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="active" className="space-y-4">
+            {proposals.active.length === 0 ? (
+              <div className="text-center text-muted-foreground">No active proposals</div>
+            ) : (
+              proposals.active.map(renderProposalCard)
+            )}
+          </TabsContent>
+          <TabsContent value="passed" className="space-y-4">
+            {proposals.passed.length === 0 ? (
+              <div className="text-center text-muted-foreground">No passed proposals</div>
+            ) : (
+              proposals.passed.map(renderProposalCard)
+            )}
+          </TabsContent>
+          <TabsContent value="rejected" className="space-y-4">
+            {proposals.rejected.length === 0 ? (
+              <div className="text-center text-muted-foreground">No rejected proposals</div>
+            ) : (
+              proposals.rejected.map(renderProposalCard)
+            )}
+          </TabsContent>
+          <TabsContent value="executed" className="space-y-4">
+            {proposals.executed.length === 0 ? (
+              <div className="text-center text-muted-foreground">No executed proposals</div>
+            ) : (
+              proposals.executed.map(renderProposalCard)
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   )
 }

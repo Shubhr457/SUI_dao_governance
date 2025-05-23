@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,17 @@ import { RecentProposals } from "@/components/recent-proposals"
 import { TreasuryOverview } from "@/components/treasury-overview"
 
 export function DashboardOverview() {
+  const [dashboardData, setDashboardData] = useState({
+    totalMembers: 0,
+    activeProposals: 0,
+    treasuryValue: 0,
+    stakedSui: 0,
+    memberGrowth: 0,
+    treasuryChange: 0,
+    stakingChange: 0,
+    recentActivity: []
+  })
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -37,10 +49,20 @@ export function DashboardOverview() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,248</div>
+            <div className="text-2xl font-bold">{dashboardData.totalMembers}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-              <span className="text-emerald-500">+12%</span> from last month
+              {dashboardData.memberGrowth !== 0 && (
+                <>
+                  {dashboardData.memberGrowth > 0 ? (
+                    <ArrowUpRight className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className={dashboardData.memberGrowth > 0 ? "text-emerald-500" : "text-red-500"}>
+                    {dashboardData.memberGrowth > 0 ? "+" : ""}{dashboardData.memberGrowth}%
+                  </span> from last month
+                </>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -50,8 +72,8 @@ export function DashboardOverview() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">7</div>
-            <p className="text-xs text-muted-foreground">3 ending in less than 24 hours</p>
+            <div className="text-2xl font-bold">{dashboardData.activeProposals}</div>
+            <p className="text-xs text-muted-foreground">Loading proposal data...</p>
           </CardContent>
         </Card>
         <Card>
@@ -60,10 +82,20 @@ export function DashboardOverview() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1.2M SUI</div>
+            <div className="text-2xl font-bold">{dashboardData.treasuryValue} SUI</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <ArrowDownRight className="h-3 w-3 text-red-500" />
-              <span className="text-red-500">-3.2%</span> from last week
+              {dashboardData.treasuryChange !== 0 && (
+                <>
+                  {dashboardData.treasuryChange > 0 ? (
+                    <ArrowUpRight className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className={dashboardData.treasuryChange > 0 ? "text-emerald-500" : "text-red-500"}>
+                    {dashboardData.treasuryChange > 0 ? "+" : ""}{dashboardData.treasuryChange}%
+                  </span> from last week
+                </>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -73,10 +105,20 @@ export function DashboardOverview() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">850K SUI</div>
+            <div className="text-2xl font-bold">{dashboardData.stakedSui} SUI</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-              <span className="text-emerald-500">+5.4%</span> from last week
+              {dashboardData.stakingChange !== 0 && (
+                <>
+                  {dashboardData.stakingChange > 0 ? (
+                    <ArrowUpRight className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className={dashboardData.stakingChange > 0 ? "text-emerald-500" : "text-red-500"}>
+                    {dashboardData.stakingChange > 0 ? "+" : ""}{dashboardData.stakingChange}%
+                  </span> from last week
+                </>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -102,54 +144,27 @@ export function DashboardOverview() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Proposal #42 Passed</p>
-                    <p className="text-xs text-muted-foreground">Treasury allocation for marketing campaign</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> 2 hours ago
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <Users className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">New Member Joined</p>
-                    <p className="text-xs text-muted-foreground">0x7a3b...f921 acquired governance tokens</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> 5 hours ago
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <XCircle className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Proposal #41 Rejected</p>
-                    <p className="text-xs text-muted-foreground">Change in validator selection criteria</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> 1 day ago
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <DollarSign className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Treasury Transaction</p>
-                    <p className="text-xs text-muted-foreground">50,000 SUI transferred to development fund</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> 2 days ago
-                    </p>
-                  </div>
-                </div>
+                {dashboardData.recentActivity.length === 0 ? (
+                  <div className="text-center text-muted-foreground">No recent activity</div>
+                ) : (
+                  dashboardData.recentActivity.map((activity, index) => (
+                    <div key={index} className="flex items-start gap-4">
+                      <div className="rounded-full bg-primary/10 p-2">
+                        {activity.type === "proposal_passed" && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                        {activity.type === "member_joined" && <Users className="h-4 w-4 text-primary" />}
+                        {activity.type === "proposal_rejected" && <XCircle className="h-4 w-4 text-primary" />}
+                        {activity.type === "treasury_transaction" && <DollarSign className="h-4 w-4 text-primary" />}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground">{activity.description}</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" /> {activity.timestamp}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
