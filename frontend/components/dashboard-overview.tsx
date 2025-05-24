@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -18,8 +18,20 @@ import {
 import Link from "next/link"
 import { RecentProposals } from "@/components/recent-proposals"
 import { TreasuryOverview } from "@/components/treasury-overview"
+import { useCurrentDAO } from "@/hooks/useDAO"
+import { daoGovernanceClient } from "@/lib/sui-client"
 
 export function DashboardOverview() {
+  const { currentDAOId } = useCurrentDAO()
+  const [loading, setLoading] = useState(true)
+  // Define activity type interface
+  interface ActivityItem {
+    type: string;
+    title: string;
+    description: string;
+    timestamp: string;
+  }
+  
   const [dashboardData, setDashboardData] = useState({
     totalMembers: 0,
     activeProposals: 0,
@@ -28,8 +40,129 @@ export function DashboardOverview() {
     memberGrowth: 0,
     treasuryChange: 0,
     stakingChange: 0,
-    recentActivity: []
+    recentActivity: [] as ActivityItem[]
   })
+  
+  // Define proposal type interface for the dashboard
+  interface ProposalData {
+    id: number;
+    status: { code: number };
+  }
+  
+  // Define activity type interface
+  interface ActivityItem {
+    type: string;
+    title: string;
+    description: string;
+    timestamp: string;
+  }
+  
+  // Function to retrieve proposal count from both blockchain and localStorage
+  useEffect(() => {
+    async function fetchDashboardData() {
+      if (!currentDAOId) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        // Normalize the DAO ID to ensure consistent format
+        const normalizedDAOId = currentDAOId.toLowerCase()
+        
+        // Attempt to get proposals from the blockchain
+        let blockchainProposals: ProposalData[] = []
+        try {
+          blockchainProposals = await daoGovernanceClient.getDAOProposals(normalizedDAOId)
+        } catch (error) {
+          console.error('Error fetching blockchain proposals:', error)
+        }
+        
+        // Get any locally stored proposals
+        const localProposals = getLocalProposals(normalizedDAOId)
+        
+        // Add logging to debug the proposal counts
+        console.log('Local proposals in dashboard:', localProposals.length, localProposals)
+        console.log('Blockchain proposals in dashboard:', blockchainProposals.length, blockchainProposals)
+        
+        // Create a Map to track unique proposals by ID
+        const uniqueProposalsMap = new Map()
+        
+        // Add local proposals to the map
+        localProposals.forEach(proposal => {
+          uniqueProposalsMap.set(proposal.id, proposal)
+        })
+        
+        // Add blockchain proposals to the map (will overwrite duplicates)
+        blockchainProposals.forEach(proposal => {
+          uniqueProposalsMap.set(proposal.id, proposal)
+        })
+        
+        // Convert map back to array
+        const allProposals = Array.from(uniqueProposalsMap.values())
+        console.log('Unique combined proposals in dashboard:', allProposals.length, allProposals)
+        
+        // Count active proposals (status code 0)
+        const activeProposals = allProposals.filter(p => p.status.code === 0).length
+        console.log('Active proposal count in dashboard:', activeProposals)
+        
+        // Update dashboard data
+        setDashboardData(prev => ({
+          ...prev,
+          activeProposals
+        }))
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [currentDAOId])
+  
+  // Helper function to get proposals from localStorage
+  const getLocalProposals = (daoId: string) => {
+    if (typeof window === 'undefined') return []
+    
+    const localProposals = []
+    const normalizedDAOId = daoId.toLowerCase()
+    const processedKeys = new Set() // Track processed keys to avoid duplicates
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('proposal-') && !processedKeys.has(key)) {
+        processedKeys.add(key)
+        try {
+          const storedData = JSON.parse(localStorage.getItem(key) || '{}')
+          
+          if (storedData.daoId && 
+              (storedData.daoId === normalizedDAOId || 
+                storedData.daoId.toLowerCase() === normalizedDAOId)) {
+            
+            // Extract proposal ID from the key
+            let proposalId: number
+            const keyParts = key.split('-')
+            if (keyParts.length > 2 && !isNaN(Number(keyParts[keyParts.length - 1]))) {
+              proposalId = Number(keyParts[keyParts.length - 1])
+            } else {
+              proposalId = storedData.id || Date.now()
+            }
+            
+            console.log(`Dashboard parsed proposal ${key} with ID:`, proposalId)
+            
+            localProposals.push({
+              id: proposalId,
+              status: { code: storedData.status?.code || 0 }
+            })
+          }
+        } catch (error) {
+          console.error('Error parsing stored proposal:', error)
+        }
+      }
+    }
+    
+    return localProposals
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,8 +205,16 @@ export function DashboardOverview() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData.activeProposals}</div>
-            <p className="text-xs text-muted-foreground">Loading proposal data...</p>
+            <div className="text-2xl font-bold">
+              {loading ? (
+                <span className="text-muted-foreground text-lg">...</span>
+              ) : (
+                dashboardData.activeProposals
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {loading ? 'Loading proposals...' : dashboardData.activeProposals === 1 ? '1 proposal active' : `${dashboardData.activeProposals} proposals active`}
+            </p>
           </CardContent>
         </Card>
         <Card>

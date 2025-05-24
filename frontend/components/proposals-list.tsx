@@ -198,20 +198,29 @@ export function ProposalsList() {
     // Format end time
     const endTime = new Date(proposal.voting_ends_at * 1000).toLocaleString()
     
+    // Truncate long titles and descriptions for mobile
+    const truncateText = (text: string, maxLength: number) => {
+      return text.length > maxLength ? text.slice(0, maxLength) + '...' : text
+    }
+    
     return (
-      <Card key={proposal.id}>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">{proposal.title}</CardTitle>
-            <Badge className={getStatusColor(proposal.status.code)}>
+      <Card key={proposal.id} className="overflow-hidden">
+        <CardHeader className="pb-2 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <CardTitle className="text-lg sm:text-xl break-words">
+              {truncateText(proposal.title, 50)}
+            </CardTitle>
+            <Badge className={`${getStatusColor(proposal.status.code)} whitespace-nowrap`}>
               {getStatusText(proposal.status.code)}
             </Badge>
           </div>
-          <CardDescription>{proposal.description}</CardDescription>
+          <CardDescription className="text-xs sm:text-sm mt-1 line-clamp-2">
+            {truncateText(proposal.description, 120)}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
               <span>For: {forPercentage}%</span>
               <span>Against: {againstPercentage}%</span>
             </div>
@@ -220,16 +229,16 @@ export function ProposalsList() {
                 <div className="h-full rounded-full bg-primary" style={{ width: `${forPercentage}%` }} />
               </div>
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>Voting ends: {endTime}</span>
+            <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3 flex-shrink-0" />
+              <span className="break-all">{endTime}</span>
             </div>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button variant="ghost" size="sm" className="ml-auto gap-1" asChild>
-            <Link href={`/proposals/${proposal.id}`}>
-              View Details <ArrowRight className="h-4 w-4" />
+        <CardFooter className="px-4 sm:px-6">
+          <Button variant="ghost" size="sm" className="w-full sm:w-auto sm:ml-auto gap-1" asChild>
+            <Link href={`/proposals/${proposal.id}`} className="flex items-center justify-center">
+              View Details <ArrowRight className="h-4 w-4 ml-1" />
             </Link>
           </Button>
         </CardFooter>
@@ -240,7 +249,7 @@ export function ProposalsList() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex w-full max-w-sm items-center space-x-2">
+        <div className="flex w-full items-center space-x-2">
           <Input
             type="text"
             placeholder="Search proposals..."
@@ -252,27 +261,27 @@ export function ProposalsList() {
             <Search className="h-4 w-4" />
           </Button>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/proposals/create">Create Proposal</Link>
         </Button>
       </div>
 
       {!currentDAOId ? (
-        <div className="text-center p-8 text-muted-foreground">
+        <div className="text-center p-4 sm:p-8 text-muted-foreground">
           No DAO selected. Please select a DAO to view its proposals.
         </div>
       ) : loading ? (
-        <div className="flex justify-center items-center p-12">
+        <div className="flex justify-center items-center p-8 sm:p-12">
           <Spinner size="lg" />
           <span className="ml-2">Loading proposals...</span>
         </div>
       ) : (
         <Tabs defaultValue="active" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="active">Active ({proposals.active.length})</TabsTrigger>
-            <TabsTrigger value="passed">Passed ({proposals.passed.length})</TabsTrigger>
-            <TabsTrigger value="rejected">Rejected ({proposals.rejected.length})</TabsTrigger>
-            <TabsTrigger value="executed">Executed ({proposals.executed.length})</TabsTrigger>
+          <TabsList className="flex flex-wrap w-full overflow-x-auto">
+            <TabsTrigger value="active" className="text-xs sm:text-sm">Active ({proposals.active.length})</TabsTrigger>
+            <TabsTrigger value="passed" className="text-xs sm:text-sm">Passed ({proposals.passed.length})</TabsTrigger>
+            <TabsTrigger value="rejected" className="text-xs sm:text-sm">Rejected ({proposals.rejected.length})</TabsTrigger>
+            <TabsTrigger value="executed" className="text-xs sm:text-sm">Executed ({proposals.executed.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="active" className="space-y-4">
             {proposals.active.length === 0 ? (

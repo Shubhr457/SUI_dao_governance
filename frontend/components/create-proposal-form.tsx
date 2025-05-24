@@ -354,13 +354,13 @@ export function CreateProposalForm() {
 
   if (!hasDAO) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 mb-6">
+      <div className="max-w-2xl mx-auto p-3 sm:p-6">
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="flex items-center gap-2 text-orange-400 mb-2">
-            <AlertCircle className="h-5 w-5" />
-            <span className="font-medium">No DAO Found</span>
+            <AlertCircle className="h-4 sm:h-5 w-4 sm:w-5 flex-shrink-0" />
+            <span className="font-medium text-sm sm:text-base">No DAO Found</span>
           </div>
-          <p className="text-gray-300 text-sm">
+          <p className="text-gray-300 text-xs sm:text-sm">
             You need to create a DAO first before you can create proposals. 
             Please go to the <Link href="/create" className="text-blue-400 hover:underline">Create DAO</Link> page first.
           </p>
@@ -370,57 +370,57 @@ export function CreateProposalForm() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-6">
+    <div className="max-w-2xl mx-auto p-3 sm:p-6">
+      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-2 text-green-400 mb-2">
-          <CheckCircle className="h-5 w-5" />
-          <span className="font-medium">DAO Connected</span>
+          <CheckCircle className="h-4 sm:h-5 w-4 sm:w-5" />
+          <span className="font-medium text-sm sm:text-base">DAO Connected</span>
         </div>
-        <p className="text-gray-300 text-sm">
+        <p className="text-gray-300 text-xs sm:text-sm break-words">
           Creating proposal for: <span className="text-white font-medium">{currentDAOName || 'Unknown DAO'}</span>
         </p>
-        <p className="text-gray-400 text-xs mt-1">
-          DAO ID: {currentDAOId?.substring(0, 8)}...{currentDAOId?.substring(currentDAOId.length - 8)}
+        <p className="text-gray-400 text-xs mt-1 break-all">
+          DAO ID: {currentDAOId?.substring(0, 6)}...{currentDAOId?.substring(currentDAOId.length - 6)}
         </p>
       </div>
 
       {/* Member Registration Check */}
       {!isMember && !isCheckingMembership && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="flex items-center gap-2 text-yellow-400 mb-2">
-            <AlertCircle className="h-5 w-5" />
-            <span className="font-medium">Member Registration Required</span>
+            <AlertCircle className="h-4 sm:h-5 w-4 sm:w-5" />
+            <span className="font-medium text-sm sm:text-base">Member Registration Required</span>
           </div>
-          <p className="text-gray-300 text-sm mb-3">
+          <p className="text-gray-300 text-xs sm:text-sm mb-3">
             You need to register as a DAO member before you can create proposals. 
             This will give you voting power in the DAO.
           </p>
           <Button 
             onClick={handleRegisterMember} 
             disabled={registerMemberMutation.isPending}
-            className="bg-yellow-600 hover:bg-yellow-700"
+            className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-xs sm:text-sm py-2"
           >
-            {registerMemberMutation.isPending ? 'Registering...' : 'Register as Member (100 Voting Power)'}
+            {registerMemberMutation.isPending ? 'Registering...' : 'Register as Member'}
           </Button>
         </div>
       )}
       
       {isCheckingMembership && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-6">
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="flex items-center gap-2 text-blue-400">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
-            <span className="font-medium">Checking membership...</span>
+            <span className="font-medium text-sm sm:text-base">Checking membership...</span>
           </div>
         </div>
       )}
 
       {isMember && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-6">
+        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="flex items-center gap-2 text-green-400 mb-2">
-            <CheckCircle className="h-5 w-5" />
-            <span className="font-medium">Member Status: Active</span>
+            <CheckCircle className="h-4 sm:h-5 w-4 sm:w-5" />
+            <span className="font-medium text-sm sm:text-base">Member Status: Active</span>
           </div>
-          <p className="text-gray-300 text-sm">
+          <p className="text-gray-300 text-xs sm:text-sm">
             Voting Power: <span className="text-white font-medium">{votingPower}</span>
           </p>
         </div>

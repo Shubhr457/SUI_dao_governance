@@ -61,13 +61,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
-        <Sidebar>
+        <Sidebar className="lg:w-64 md:w-56 sm:w-14">
           <SidebarHeader>
             <div className="flex items-center gap-2 px-4 py-2">
               <div className="rounded-full bg-primary p-1 text-primary-foreground">
                 <Users className="h-5 w-5" />
               </div>
-              <span className="font-bold">SuiDAO Governance</span>
+              <span className="font-bold hidden sm:inline">SuiDAO Governance</span>
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -75,9 +75,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.title}>
-                    <Link href={item.href}>
+                    <Link href={item.href} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="hidden sm:inline">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -88,37 +88,37 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Settings">
-                  <Link href="/settings">
+                  <Link href="/settings" className="flex items-center gap-2">
                     <Settings className="h-4 w-4" />
-                    <span>Settings</span>
+                    <span className="hidden sm:inline">Settings</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Help">
-                  <Link href="/help">
+                  <Link href="/help" className="flex items-center gap-2">
                     <HelpCircle className="h-4 w-4" />
-                    <span>Help</span>
+                    <span className="hidden sm:inline">Help</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Logout">
+                <SidebarMenuButton tooltip="Logout" className="flex items-center gap-2">
                   <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
+                  <span className="hidden sm:inline">Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1">
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
-            <SidebarTrigger />
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background px-3 sm:px-6">
+            <SidebarTrigger className="md:hidden" />
             <div className="ml-auto">
               <ConnectWalletButton />
             </div>
           </header>
-          <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 p-3 sm:p-6">{children}</main>
         </div>
       </div>
     </SidebarProvider>
